@@ -6,7 +6,7 @@ import {
   Activity, TrendingUp, BarChart3, FileSpreadsheet
 } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://sistema-pmvg-backend.onrender.com/api';
 
 const styles = {
   container: {
