@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 // URL do backend no Render
-const API_BASE_URL = 'https://sistema-pmvg-backend.onrender.com/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://sistema-pmvg-backend.onrender.com/api';
 
 const styles = {
   container: {
@@ -496,7 +496,7 @@ function App() {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -770,8 +770,8 @@ function App() {
           <div style={styles.logo}>
             <Shield style={styles.logoIcon} />
             <div>
-              <h1 style={styles.title}>Licitapharma</h1>
-              <p style={styles.subtitle}>Sistema Anti-Multa para Distribuidoras Farmacêuticas</p>
+              <h1 style={styles.title}>Sistema PMVG</h1>
+              <p style={styles.subtitle}>Preço Máximo de Venda ao Governo</p>
             </div>
           </div>
           <div style={styles.userInfo}>
@@ -940,8 +940,8 @@ const LoginScreen = ({ onLogin, loading }) => {
       <div style={styles.loginCard}>
         <div style={styles.loginHeader}>
           <Shield style={{ ...styles.logoIcon, margin: '0 auto 1rem' }} />
-          <h1 style={{ ...styles.title, fontSize: '1.5rem' }}>Licitapharma</h1>
-          <p style={styles.subtitle}>Sistema Anti-Multa para Distribuidoras Farmacêuticas</p>
+          <h1 style={{ ...styles.title, fontSize: '1.5rem' }}>Sistema PMVG</h1>
+          <p style={styles.subtitle}>Preço Máximo de Venda ao Governo</p>
         </div>
 
         <form onSubmit={handleSubmit} style={styles.form}>
@@ -984,8 +984,8 @@ const LoginScreen = ({ onLogin, loading }) => {
 
         <div style={{ marginTop: '1.5rem', fontSize: '0.875rem', color: '#6b7280', textAlign: 'center' }}>
           <p style={{ marginBottom: '0.5rem' }}>👤 Usuários de demonstração:</p>
-          <p><strong>Admin:</strong> admin@licitapharma.com / 123456</p>
-          <p><strong>Cliente:</strong> usuario@licitapharma.com / 123456</p>
+          <p><strong>Admin:</strong> admin@sistema.com / 123456</p>
+          <p><strong>Cliente:</strong> usuario@sistema.com / 123456</p>
         </div>
       </div>
     </div>
@@ -1024,7 +1024,7 @@ const DashboardView = ({ systemStatus, licitacoes, alertas, pmvgStatus, user, ch
   return (
     <div>
       <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Dashboard - Licitapharma Anti-Multa</h2>
+        <h2 style={styles.cardTitle}>Dashboard - Sistema PMVG Avançado</h2>
         
         <div style={styles.statsGrid}>
           <StatCard
@@ -1109,7 +1109,7 @@ const DashboardView = ({ systemStatus, licitacoes, alertas, pmvgStatus, user, ch
       {/* Resumo de Compliance */}
       <div style={styles.card}>
         <h3 style={{ ...styles.cardTitle, fontSize: '1.125rem' }}>
-          Análise de Compliance Anti-Multa
+          Análise de Compliance PMVG
         </h3>
         
         <div style={styles.priceComparison}>
@@ -1480,7 +1480,7 @@ const LicitacoesView = ({ licitacoes, onOpenModal, onDelete, user }) => (
   <div>
     <div style={styles.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <h2 style={styles.cardTitle}>Gestão Inteligente de Licitações</h2>
+        <h2 style={styles.cardTitle}>Gestão de Licitações PMVG</h2>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
             onClick={() => onOpenModal('licitacao')}
@@ -1500,7 +1500,7 @@ const LicitacoesView = ({ licitacoes, onOpenModal, onDelete, user }) => (
         <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
           <FileText size={64} style={{ margin: '0 auto 1rem', color: '#d1d5db' }} />
           <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem' }}>Nenhuma licitação cadastrada</h3>
-          <p style={{ margin: '0 0 1rem 0' }}>Comece criando sua primeira licitação com sistema anti-multa</p>
+          <p style={{ margin: '0 0 1rem 0' }}>Comece criando sua primeira licitação com sistema PMVG</p>
           <button
             onClick={() => onOpenModal('licitacao')}
             style={{ ...styles.button, ...styles.buttonPrimary }}
@@ -1627,7 +1627,7 @@ const AlertasView = ({ alertas, pmvgStatus, onResolverAlerta }) => {
     <div>
       <div style={styles.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={styles.cardTitle}>Central de Alertas Anti-Multa</h2>
+          <h2 style={styles.cardTitle}>Central de Alertas PMVG</h2>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button style={{ ...styles.button, ...styles.buttonPrimary }}>
               <RefreshCw size={16} />
@@ -1939,10 +1939,10 @@ const ComparacaoView = ({ licitacoes, searchMedicamentos }) => {
           }}>
             <Calculator size={64} style={{ margin: '0 auto 1rem', color: '#d1d5db' }} />
             <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', color: '#374151' }}>
-              Análise de Preços Anti-Multa
+              Análise de Preços PMVG
             </h3>
             <p style={{ margin: 0, color: '#6b7280' }}>
-              Digite o nome do medicamento acima para analisar conformidade com PMVG e evitar multas
+              Digite o nome do medicamento acima para analisar conformidade com PMVG
             </p>
           </div>
         )}
@@ -2745,9 +2745,9 @@ const Modal = ({ type, data, searchMedicamentos, onClose, onSave }) => {
           {activeTab === 'comparacao' && selectedMedicamentos.length > 0 && (
             <div>
               <div style={{ marginBottom: '1rem' }}>
-                <h4 style={{ margin: '0 0 0.5rem 0' }}>Análise Anti-Multa por Medicamento</h4>
+                <h4 style={{ margin: '0 0 0.5rem 0' }}>Análise PMVG por Medicamento</h4>
                 <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
-                  Verificação automática de conformidade para prevenir multas e riscos contratuais
+                  Verificação automática de conformidade para prevenir problemas contratuais
                 </p>
               </div>
 
