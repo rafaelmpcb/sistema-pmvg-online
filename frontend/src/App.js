@@ -11,8 +11,7 @@ import {
 } from 'lucide-react';
 
 // URL do backend no Render
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://licitapharma-backend.onrender.com/api';
-
+const API_BASE_URL = 'https://sistema-pmvg-backend.onrender.com/api';
 const styles = {
   container: {
     minHeight: '100vh',
