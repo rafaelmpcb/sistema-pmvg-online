@@ -12,6 +12,7 @@ import {
 
 // URL do backend no Render
 const API_BASE_URL = 'https://sistema-pmvg-backend.onrender.com/api';
+
 const styles = {
   container: {
     minHeight: '100vh',
@@ -866,6 +867,8 @@ function App() {
               licitacoes={licitacoes}
               alertas={alertas}
               pmvgStatus={pmvgStatus}
+              user={user}
+              checkMonthlyNotifications={checkMonthlyNotifications}
             />
           )}
           {currentView === 'pmvg' && (
@@ -1009,7 +1012,7 @@ const NavButton = ({ icon: Icon, label, active, onClick, badge }) => (
 );
 
 // Dashboard View
-const DashboardView = ({ systemStatus, licitacoes, alertas, pmvgStatus }) => {
+const DashboardView = ({ systemStatus, licitacoes, alertas, pmvgStatus, user, checkMonthlyNotifications }) => {
   const alertasAtivos = alertas.filter(a => a.status === 'ativo');
   const licitacoesAtivas = licitacoes.filter(l => l.status === 'ativa');
   
@@ -2403,7 +2406,7 @@ const Modal = ({ type, data, searchMedicamentos, onClose, onSave }) => {
             <div>
               {/* Cabeçalho com opções */}
               <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <div>
                     <h4 style={{ margin: '0 0 0.25rem 0' }}>Adicionar Medicamentos</h4>
                     <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
@@ -2737,106 +2740,6 @@ const Modal = ({ type, data, searchMedicamentos, onClose, onSave }) => {
                 </div>
               )}
             </div>
-          )}style.backgroundColor = 'white'}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontWeight: '500', fontSize: '0.875rem' }}>{med.nome}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                              {med.laboratorio} - PMVG: R$ {med.pmvg.toFixed(2)}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            style={{ ...styles.button, ...styles.buttonPrimary, padding: '0.25rem 0.5rem' }}
-                          >
-                            <Plus size={14} />
-                            Adicionar
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Medicamentos Selecionados */}
-              {selectedMedicamentos.length > 0 && (
-                <div>
-                  <h4 style={{ margin: '0 0 1rem 0' }}>Medicamentos Selecionados ({selectedMedicamentos.length})</h4>
-                  <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px' }}>
-                    <table style={styles.table}>
-                      <thead>
-                        <tr>
-                          <th style={styles.th}>Medicamento</th>
-                          <th style={styles.th}>PMVG</th>
-                          <th style={styles.th}>Preço Ofertado</th>
-                          <th style={styles.th}>Quantidade</th>
-                          <th style={styles.th}>Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedMedicamentos.map(med => (
-                          <tr key={med.id || med.codigo}>
-                            <td style={styles.td}>
-                              <div>
-                                <div style={{ fontWeight: '500', fontSize: '0.875rem' }}>{med.nome}</div>
-                                <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{med.laboratorio}</div>
-                              </div>
-                            </td>
-                            <td style={styles.td}>R$ {med.pmvg.toFixed(2)}</td>
-                            <td style={styles.td}>
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={med.precoOfertado || ''}
-                                onChange={(e) => updateMedicamentoData(med.id || med.codigo, 'precoOfertado', e.target.value)}
-                                style={{ ...styles.input, padding: '0.25rem', fontSize: '0.875rem' }}
-                                placeholder="0.00"
-                              />
-                            </td>
-                            <td style={styles.td}>
-                              <input
-                                type="number"
-                                value={med.quantidade || 1}
-                                onChange={(e) => updateMedicamentoData(med.id || med.codigo, 'quantidade', e.target.value)}
-                                style={{ ...styles.input, padding: '0.25rem', fontSize: '0.875rem' }}
-                                min="1"
-                              />
-                            </td>
-                            <td style={styles.td}>
-                              <button
-                                type="button"
-                                onClick={() => removeMedicamento(med.id || med.codigo)}
-                                style={{ ...styles.button, ...styles.buttonDanger, padding: '0.25rem' }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {selectedMedicamentos.length === 0 && (
-                <div style={{ 
-                  padding: '2rem', 
-                  textAlign: 'center', 
-                  backgroundColor: '#f9fafb', 
-                  borderRadius: '6px',
-                  border: '2px dashed #e5e7eb'
-                }}>
-                  <Search size={48} style={{ margin: '0 auto 1rem', color: '#d1d5db' }} />
-                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Nenhum medicamento selecionado</h4>
-                  <p style={{ margin: 0, color: '#6b7280' }}>
-                    Use a busca acima para encontrar medicamentos na base PMVG da ANVISA
-                  </p>
-                </div>
-              )}
-            </div>
           )}
 
           {activeTab === 'comparacao' && selectedMedicamentos.length > 0 && (
@@ -3088,7 +2991,6 @@ const Modal = ({ type, data, searchMedicamentos, onClose, onSave }) => {
       </div>
     </div>
   );
-};
 };
 
 // Componente de Estatística
