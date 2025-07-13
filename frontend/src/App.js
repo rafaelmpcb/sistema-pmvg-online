@@ -13,6 +13,10 @@ import {
 // URL do backend no Render
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://sistema-pmvg-backend.onrender.com/api';
 
+// ✅ NOVO: Debug para verificar URL da API
+console.log('🌐 API Base URL configurada:', API_BASE_URL);
+console.log('🔧 Variável de ambiente REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
+
 const styles = {
   container: {
     minHeight: '100vh',
@@ -563,6 +567,37 @@ function App() {
     }
   };
 
+  // ✅ NOVO: Função para testar conectividade e forçar reload
+  const testConnectivity = async () => {
+    setLoading(true);
+    showMessage('info', '🔄 Testando conectividade com backend...');
+    
+    try {
+      // Testar health check
+      const healthResponse = await fetch(`${API_BASE_URL}/health`, {
+        method: 'GET',
+        timeout: 10000
+      });
+      
+      if (!healthResponse.ok) {
+        throw new Error(`Backend retornou status ${healthResponse.status}`);
+      }
+      
+      showMessage('success', '✅ Backend conectado! Atualizando dados...');
+      
+      // Recarregar dados
+      await loadSystemStatus();
+      await loadData();
+      
+      showMessage('success', '✅ Dados atualizados com sucesso!');
+    } catch (error) {
+      console.error('❌ Erro na conectividade:', error);
+      showMessage('error', `❌ Erro: ${error.message}. Verifique se o backend está rodando no Render.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updatePrecoFabrica = async (medicamentoId, novoPreco) => {
     try {
       const response = await api(`/medicamentos/${medicamentoId}/preco-fabrica`, {
@@ -708,15 +743,33 @@ function App() {
     }
   };
 
-  // Função para buscar medicamentos da PMVG via API
+  // ✅ CORRIGIDO: Função de busca com melhor tratamento de erro
   const searchMedicamentos = async (searchTerm) => {
     if (!searchTerm || searchTerm.length < 2) return [];
     
     try {
+      console.log('🔍 Buscando medicamentos:', searchTerm);
+      console.log('🌐 API URL:', `${API_BASE_URL}/medicamentos/search?q=${encodeURIComponent(searchTerm)}`);
+      
       const response = await api(`/medicamentos/search?q=${encodeURIComponent(searchTerm)}`);
-      return response || [];
+      
+      if (!response) {
+        console.warn('⚠️ Resposta vazia da API');
+        showMessage('error', 'Backend não respondeu. Verifique se está rodando no Render.');
+        return [];
+      }
+      
+      if (Array.isArray(response) && response.length === 0) {
+        console.warn('⚠️ Nenhum medicamento encontrado na base');
+        showMessage('warning', `Nenhum medicamento encontrado para "${searchTerm}". Base pode não estar sincronizada.`);
+        return [];
+      }
+      
+      console.log('✅ Medicamentos encontrados:', response.length);
+      return response;
     } catch (error) {
-      console.error('Erro ao buscar medicamentos:', error);
+      console.error('❌ Erro ao buscar medicamentos:', error);
+      showMessage('error', `Erro na busca: ${error.message || 'Servidor não conectado'}`);
       return [];
     }
   };
@@ -903,6 +956,7 @@ function App() {
               isAdmin={user.role === 'admin'}
               onUpdatePrecoFabrica={updatePrecoFabrica}
               searchMedicamentos={searchMedicamentos}
+              testConnectivity={testConnectivity} // ✅ NOVO: Passar função de teste
             />
           )}
           {currentView === 'licitacoes' && (
@@ -1402,7 +1456,7 @@ const DashboardView = ({ systemStatus, licitacoes, alertas, pmvgStatus, user, ch
 };
 
 // PMVG View com busca inteligente
-const PMVGView = ({ pmvgStatus, loading, isAdmin, onUpdatePrecoFabrica, searchMedicamentos }) => {
+const PMVGView = ({ pmvgStatus, loading, isAdmin, onUpdatePrecoFabrica, searchMedicamentos, testConnectivity }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -1413,17 +1467,44 @@ const PMVGView = ({ pmvgStatus, loading, isAdmin, onUpdatePrecoFabrica, searchMe
     'Anti-inflamatório', 'Antidiabético', 'Hipolipemiante', 'Diurético'
   ];
 
+  // ✅ CORRIGIDO: Verificação de conectividade com backend
+  const checkBackendConnectivity = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        method: 'GET',
+        timeout: 5000
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('❌ Backend não conectado:', error);
+      return false;
+    }
+  };
+
   const handleSearch = async (term) => {
     setSearchTerm(term);
     
     if (term.length >= 2) {
       setIsSearching(true);
       try {
+        // ✅ NOVO: Verificar conectividade primeiro
+        const isBackendConnected = await checkBackendConnectivity();
+        if (!isBackendConnected) {
+          setSearchResults([]);
+          alert('❌ Erro: Backend não conectado. Clique em "Verificar Conexão" para diagnosticar.');
+          setIsSearching(false);
+          return;
+        }
+
         const results = await searchMedicamentos(term);
+        if (!results || results.length === 0) {
+          alert('⚠️ Nenhum medicamento encontrado. A base PMVG pode não estar sincronizada.');
+        }
         setSearchResults(results);
       } catch (error) {
         console.error('Erro na busca:', error);
         setSearchResults([]);
+        alert('❌ Erro na busca: ' + error.message);
       } finally {
         setIsSearching(false);
       }
@@ -1432,38 +1513,72 @@ const PMVGView = ({ pmvgStatus, loading, isAdmin, onUpdatePrecoFabrica, searchMe
     }
   };
 
+  // ✅ CORRIGIDO: Cálculo correto da próxima atualização (dia 28)
   const proximaAtualizacao = new Date();
-  proximaAtualizacao.setMonth(proximaAtualizacao.getMonth() + 1);
-  proximaAtualizacao.setDate(28);
+  const hoje = new Date();
+  
+  // Se ainda não chegou no dia 28 deste mês, próxima será este mês
+  if (hoje.getDate() <= 28) {
+    proximaAtualizacao.setDate(28);
+  } else {
+    // Se já passou do dia 28, próxima será no mês seguinte
+    proximaAtualizacao.setMonth(proximaAtualizacao.getMonth() + 1);
+    proximaAtualizacao.setDate(28);
+  }
 
   return (
     <div>
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Base de Dados PMVG - ANVISA</h2>
         
-        {/* Status da Atualização Automática */}
+        {/* ✅ CORRIGIDO: Status da Atualização com diagnóstico */}
         <div style={{ 
-          background: 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)',
-          borderLeft: '4px solid #16a34a',
+          background: pmvgStatus?.totalMedicamentos > 0 ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)' : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+          borderLeft: `4px solid ${pmvgStatus?.totalMedicamentos > 0 ? '#16a34a' : '#dc2626'}`,
           padding: '1rem',
           borderRadius: '6px',
           marginBottom: '1.5rem'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#16a34a', fontWeight: '600' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: pmvgStatus?.totalMedicamentos > 0 ? '#16a34a' : '#dc2626', fontWeight: '600' }}>
               <Database size={20} />
-              <span>Base PMVG Sincronizada Automaticamente</span>
+              <span>{pmvgStatus?.totalMedicamentos > 0 ? 'Base PMVG Sincronizada Automaticamente' : '❌ Base PMVG Não Conectada'}</span>
             </div>
-            <div style={{ fontSize: '0.875rem', color: '#15803d' }}>
-              {pmvgStatus?.totalMedicamentos || 'Carregando...'} medicamentos
+            <div style={{ fontSize: '0.875rem', color: pmvgStatus?.totalMedicamentos > 0 ? '#15803d' : '#b91c1c' }}>
+              {pmvgStatus?.totalMedicamentos > 0 ? `${pmvgStatus.totalMedicamentos} medicamentos` : 'Aguardando conexão...'}
             </div>
           </div>
-          <div style={{ fontSize: '0.875rem', color: '#15803d' }}>
-            <strong>Última sincronização:</strong> {pmvgStatus?.lastUpdate ? new Date(pmvgStatus.lastUpdate).toLocaleDateString('pt-BR') : '28/01/2025'} às 06:00h (automática)
-          </div>
-          <div style={{ fontSize: '0.875rem', color: '#15803d' }}>
-            <strong>Próxima sincronização:</strong> {proximaAtualizacao.toLocaleDateString('pt-BR')} às 06:00h
-          </div>
+          
+          {pmvgStatus?.totalMedicamentos > 0 ? (
+            <>
+              <div style={{ fontSize: '0.875rem', color: '#15803d' }}>
+                <strong>Última sincronização:</strong> {pmvgStatus?.lastUpdate ? new Date(pmvgStatus.lastUpdate).toLocaleDateString('pt-BR') : '28/01/2025'} às 06:00h (automática)
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#15803d' }}>
+                <strong>Próxima sincronização:</strong> {proximaAtualizacao.toLocaleDateString('pt-BR')} às 06:00h
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: '0.875rem', color: '#b91c1c' }}>
+              <div><strong>❌ Problema identificado:</strong> Backend não está conectado com a ANVISA</div>
+              <div><strong>🔧 Ação necessária:</strong> Verificar se o backend está rodando no Render</div>
+              <div><strong>📋 Checklist:</strong></div>
+              <ul style={{ margin: '0.5rem 0 0 1rem', fontSize: '0.75rem' }}>
+                <li>Backend deployado no Render.com</li>
+                <li>Variável REACT_APP_API_URL configurada no Vercel</li>
+                <li>Primeira sincronização ANVISA concluída</li>
+              </ul>
+            </div>
+          )}
+          
+          {pmvgStatus?.lastUpdateDetails && (
+            <div style={{ marginTop: '0.75rem', padding: '0.5rem', backgroundColor: 'rgba(22, 163, 74, 0.1)', borderRadius: '4px' }}>
+              <div style={{ fontSize: '0.75rem', color: '#15803d' }}>
+                📊 <strong>Última sincronização:</strong> {pmvgStatus.lastUpdateDetails.medicamentosProcessados} medicamentos processados, 
+                {pmvgStatus.lastUpdateDetails.novos} novos, {pmvgStatus.lastUpdateDetails.atualizados} atualizados
+              </div>
+            </div>
+          )}
         </div>
         
         {/* Busca Inteligente */}
@@ -1505,6 +1620,20 @@ const PMVGView = ({ pmvgStatus, loading, isAdmin, onUpdatePrecoFabrica, searchMe
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
+            {/* ✅ NOVO: Botão para testar conectividade */}
+            <button
+              onClick={testConnectivity}
+              disabled={loading}
+              style={{ 
+                ...styles.button, 
+                ...(pmvgStatus?.totalMedicamentos > 0 ? styles.buttonSecondary : styles.buttonPrimary),
+                opacity: loading ? 0.6 : 1
+              }}
+              title="Testar conexão com backend e recarregar dados"
+            >
+              <RefreshCw size={16} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+              {loading ? 'Testando...' : 'Verificar Conexão'}
+            </button>
           </div>
           
           <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
@@ -1579,37 +1708,73 @@ const PMVGView = ({ pmvgStatus, loading, isAdmin, onUpdatePrecoFabrica, searchMe
           </div>
         )}
 
-        {/* Instruções quando não há busca */}
+        {/* ✅ CORRIGIDO: Instruções com diagnóstico */}
         {searchTerm.length < 2 && (
           <div style={{ 
             padding: '3rem 1rem', 
             textAlign: 'center', 
-            backgroundColor: '#f9fafb', 
+            backgroundColor: pmvgStatus?.totalMedicamentos > 0 ? '#f9fafb' : '#fef2f2', 
             borderRadius: '8px',
-            border: '2px dashed #e5e7eb'
+            border: `2px dashed ${pmvgStatus?.totalMedicamentos > 0 ? '#e5e7eb' : '#fecaca'}`
           }}>
-            <Database size={64} style={{ margin: '0 auto 1rem', color: '#d1d5db' }} />
-            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', color: '#374151' }}>
-              Busca Inteligente na Base PMVG
-            </h3>
-            <p style={{ margin: '0 0 1rem 0', color: '#6b7280', maxWidth: '600px', margin: '0 auto' }}>
-              Digite o nome de qualquer medicamento no campo acima para buscar instantaneamente 
-              na base completa da ANVISA com milhares de medicamentos atualizados automaticamente.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', maxWidth: '600px', margin: '1.5rem auto 0', fontSize: '0.875rem' }}>
-              <div style={{ color: '#2563eb' }}>
-                <strong>📊 Base Completa</strong><br/>
-                Milhares de medicamentos
-              </div>
-              <div style={{ color: '#16a34a' }}>
-                <strong>🔄 Atualização Auto</strong><br/>
-                Todo dia 28 às 06h
-              </div>
-              <div style={{ color: '#d97706' }}>
-                <strong>⚡ Busca Instant.</strong><br/>
-                Resultados em tempo real
-              </div>
-            </div>
+            <Database size={64} style={{ margin: '0 auto 1rem', color: pmvgStatus?.totalMedicamentos > 0 ? '#d1d5db' : '#dc2626' }} />
+            
+            {pmvgStatus?.totalMedicamentos > 0 ? (
+              <>
+                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', color: '#374151' }}>
+                  Busca Inteligente na Base PMVG
+                </h3>
+                <p style={{ margin: '0 0 1rem 0', color: '#6b7280', maxWidth: '600px', margin: '0 auto' }}>
+                  Digite o nome de qualquer medicamento no campo acima para buscar instantaneamente 
+                  na base completa da ANVISA com {pmvgStatus.totalMedicamentos} medicamentos atualizados automaticamente.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', maxWidth: '600px', margin: '1.5rem auto 0', fontSize: '0.875rem' }}>
+                  <div style={{ color: '#2563eb' }}>
+                    <strong>📊 Base Completa</strong><br/>
+                    {pmvgStatus.totalMedicamentos} medicamentos
+                  </div>
+                  <div style={{ color: '#16a34a' }}>
+                    <strong>🔄 Atualização Auto</strong><br/>
+                    Todo dia 28 às 06h
+                  </div>
+                  <div style={{ color: '#d97706' }}>
+                    <strong>⚡ Busca Instant.</strong><br/>
+                    Resultados em tempo real
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', color: '#dc2626' }}>
+                  ❌ Base PMVG Não Sincronizada
+                </h3>
+                <p style={{ margin: '0 0 1rem 0', color: '#b91c1c', maxWidth: '600px', margin: '0 auto' }}>
+                  A base de dados da ANVISA não foi carregada. O sistema não pode funcionar sem dados reais.
+                </p>
+                <div style={{ 
+                  backgroundColor: 'white', 
+                  border: '1px solid #fecaca', 
+                  borderRadius: '6px', 
+                  padding: '1rem', 
+                  margin: '1rem auto', 
+                  maxWidth: '500px',
+                  textAlign: 'left',
+                  fontSize: '0.875rem'
+                }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#dc2626' }}>🔧 Passos para resolver:</h4>
+                  <ol style={{ margin: '0', paddingLeft: '1rem', color: '#7f1d1d' }}>
+                    <li>Verificar se backend está deployado no Render</li>
+                    <li>Confirmar variável REACT_APP_API_URL no Vercel</li>
+                    <li>Aguardar primeira sincronização com ANVISA (5-10 min)</li>
+                    <li>Verificar logs do Render para erros</li>
+                  </ol>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '1rem' }}>
+                  💡 <strong>Dica:</strong> Sem a base PMVG, o sistema apenas simula dados. 
+                  Para funcionar corretamente, precisa conectar com dados reais da ANVISA.
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
