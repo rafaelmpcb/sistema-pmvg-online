@@ -430,9 +430,10 @@ function App() {
   const [message, setMessage] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
+  const [selectedLicitacao, setSelectedLicitacao] = useState(null); // ✅ CORRIGIDO: Estado adicionado
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailConfig, setEmailConfig] = useState({
-    email: user?.email || '',
+    email: '',
     notificacoesMensais: true,
     alertasCriticos: true,
     relatoriosSemanais: false
@@ -460,6 +461,7 @@ function App() {
     
     if (token && userData) {
       setUser(JSON.parse(userData));
+      setEmailConfig(prev => ({ ...prev, email: JSON.parse(userData).email })); // ✅ CORRIGIDO: Atualizar email no config
       loadSystemStatus();
       loadData();
       
@@ -514,6 +516,7 @@ function App() {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         setUser(data.user);
+        setEmailConfig(prev => ({ ...prev, email: data.user.email })); // ✅ CORRIGIDO: Atualizar email no login
         await loadSystemStatus();
         await loadData();
         showMessage('success', 'Login realizado com sucesso!');
@@ -662,12 +665,10 @@ function App() {
   };
 
   const openEmailConfig = () => {
-    setEmailConfig({
-      email: user?.email || '',
-      notificacoesMensais: true,
-      alertasCriticos: true,
-      relatoriosSemanais: false
-    });
+    setEmailConfig(prev => ({
+      ...prev,
+      email: user?.email || ''
+    }));
     setShowEmailModal(true);
   };
 
@@ -677,6 +678,9 @@ function App() {
     showMessage('success', 'Configurações de email salvas com sucesso!');
     setShowEmailModal(false);
   };
+
+  // ✅ CORRIGIDO: Função exportData completa
+  const exportData = async (type, format) => {
     try {
       const response = await fetch(`${API_BASE_URL}/relatorios/${type}?format=${format}`, {
         headers: {
@@ -736,23 +740,26 @@ function App() {
     }
   };
 
-  // Função para gerar notificações mensais automáticas
+  // ✅ CORRIGIDO: Função checkMonthlyNotifications reparada
   const checkMonthlyNotifications = () => {
     const hoje = new Date();
     const ultimaNotificacao = localStorage.getItem('ultimaNotificacaoMensal');
     const ultimaData = ultimaNotificacao ? new Date(ultimaNotificacao) : null;
     
-    // Verificar se passou um mês desde a última notificação
+    // Verificar se passou um mês desde a última notificação OU se é dia 28
     const umMesAtras = new Date();
     umMesAtras.setMonth(umMesAtras.getMonth() - 1);
     
-    if (!ultimaData || ultimaData < umMesAtras) {
+    const isDia28 = hoje.getDate() === 28;
+    const tempoParaNotificar = !ultimaData || ultimaData < umMesAtras || isDia28;
+    
+    if (tempoParaNotificar) {
       // Gerar notificação mensal
       const notificacao = {
         id: `notif-mensal-${Date.now()}`,
         tipo: 'notificacao_mensal',
-        titulo: 'Lembrete: Atualização Mensal de Preços',
-        descricao: 'É recomendado atualizar os preços de fábrica mensalmente para manter a precisão dos relatórios e evitar riscos contratuais.',
+        titulo: 'Lembrete: Atualização Mensal de Preços PMVG',
+        descricao: 'É recomendado atualizar os preços de fábrica mensalmente para manter a precisão dos relatórios e evitar riscos contratuais. A base PMVG é atualizada automaticamente todo dia 28.',
         prioridade: 'media',
         status: 'ativo',
         dataGeracao: new Date().toISOString(),
@@ -886,6 +893,7 @@ function App() {
               pmvgStatus={pmvgStatus}
               user={user}
               checkMonthlyNotifications={checkMonthlyNotifications}
+              openEmailConfig={openEmailConfig} // ✅ CORRIGIDO: Passar função
             />
           )}
           {currentView === 'pmvg' && (
@@ -938,9 +946,123 @@ function App() {
           onSave={modalType === 'licitacao' ? saveLicitacao : closeModal}
         />
       )}
+
+      {/* ✅ NOVO: Modal de Configuração de Email */}
+      {showEmailModal && (
+        <EmailConfigModal 
+          emailConfig={emailConfig}
+          setEmailConfig={setEmailConfig}
+          onSave={saveEmailConfig}
+          onClose={() => setShowEmailModal(false)}
+        />
+      )}
     </div>
   );
 }
+
+// ✅ NOVO: Componente Modal de Configuração de Email
+const EmailConfigModal = ({ emailConfig, setEmailConfig, onSave, onClose }) => (
+  <div style={styles.modal}>
+    <div style={styles.modalContent}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+        <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Mail size={24} color="#2563eb" />
+          Configurações de Email
+        </h3>
+        <button onClick={onClose} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>
+          <X size={24} />
+        </button>
+      </div>
+
+      <div style={styles.form}>
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Email para Notificações</label>
+          <input
+            type="email"
+            value={emailConfig.email}
+            onChange={(e) => setEmailConfig({...emailConfig, email: e.target.value})}
+            style={styles.input}
+            placeholder="seu.email@empresa.com"
+          />
+        </div>
+
+        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '1rem', marginTop: '1rem' }}>
+          <h4 style={{ margin: '0 0 1rem 0', fontSize: '1rem', fontWeight: '600' }}>
+            Tipos de Notificação
+          </h4>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={emailConfig.notificacoesMensais}
+                onChange={(e) => setEmailConfig({...emailConfig, notificacoesMensais: e.target.checked})}
+                style={{ width: '18px', height: '18px' }}
+              />
+              <div>
+                <div style={{ fontWeight: '500' }}>📅 Lembretes Mensais (Dia 28)</div>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  Atualização da base PMVG e revisão de preços de fábrica
+                </div>
+              </div>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={emailConfig.alertasCriticos}
+                onChange={(e) => setEmailConfig({...emailConfig, alertasCriticos: e.target.checked})}
+                style={{ width: '18px', height: '18px' }}
+              />
+              <div>
+                <div style={{ fontWeight: '500' }}>🚨 Alertas Críticos</div>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  Riscos de multa, não conformidade PMVG e problemas contratuais
+                </div>
+              </div>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={emailConfig.relatoriosSemanais}
+                onChange={(e) => setEmailConfig({...emailConfig, relatoriosSemanais: e.target.checked})}
+                style={{ width: '18px', height: '18px' }}
+              />
+              <div>
+                <div style={{ fontWeight: '500' }}>📊 Relatórios Semanais</div>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  Resumo semanal de atividades e status das licitações
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div style={{ ...styles.alert, ...styles.alertInfo, marginTop: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Bell size={16} />
+            <strong>Sistema de Notificações Automáticas</strong>
+          </div>
+          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
+            As notificações são enviadas automaticamente baseadas nas configurações acima. 
+            Você pode alterar essas preferências a qualquer momento.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+          <button onClick={onClose} style={{ ...styles.button, ...styles.buttonSecondary }}>
+            Cancelar
+          </button>
+          <button onClick={onSave} style={{ ...styles.button, ...styles.buttonPrimary }}>
+            <Save size={16} />
+            Salvar Configurações
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 // Componente de Login
 const LoginScreen = ({ onLogin, loading }) => {
@@ -1029,7 +1151,7 @@ const NavButton = ({ icon: Icon, label, active, onClick, badge }) => (
 );
 
 // Dashboard View
-const DashboardView = ({ systemStatus, licitacoes, alertas, pmvgStatus, user, checkMonthlyNotifications }) => {
+const DashboardView = ({ systemStatus, licitacoes, alertas, pmvgStatus, user, checkMonthlyNotifications, openEmailConfig }) => {
   const alertasAtivos = alertas.filter(a => a.status === 'ativo');
   const licitacoesAtivas = licitacoes.filter(l => l.status === 'ativa');
   
@@ -1202,8 +1324,8 @@ const DashboardView = ({ systemStatus, licitacoes, alertas, pmvgStatus, user, ch
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.875rem', color: '#1e40af' }}>
             <div>
-              <strong>📅 Lembrete Mensal:</strong><br/>
-              Atualização de preços de fábrica
+              <strong>📅 Lembrete Mensal (Dia 28):</strong><br/>
+              Atualização da base PMVG e preços de fábrica
             </div>
             <div>
               <strong>🚨 Alertas Críticos:</strong><br/>
@@ -1220,7 +1342,7 @@ const DashboardView = ({ systemStatus, licitacoes, alertas, pmvgStatus, user, ch
               Testar Notificação
             </button>
             <button 
-              onClick={() => openEmailConfig()}
+              onClick={openEmailConfig} // ✅ CORRIGIDO: Função agora funciona
               style={{ ...styles.button, ...styles.buttonPrimary }}
             >
               <Settings size={16} />
@@ -2738,7 +2860,7 @@ const Modal = ({ type, data, searchMedicamentos, onClose, onSave }) => {
                     </div>
                     <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.875rem' }}>
                       Mantenha os preços de fábrica sempre atualizados para garantir análises precisas e evitar riscos contratuais. 
-                      Recomendamos atualização mensal.
+                      A base PMVG é atualizada automaticamente todo dia 28.
                     </p>
                   </div>
                 </div>
